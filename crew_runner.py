@@ -47,7 +47,7 @@ def extract_json(text: str) -> dict:
     return json.loads(match.group(0))
 
 
-def find_jobs(cv_text: str, locations: list[str], limit: int, api_key: str, on_stage):
+def find_jobs(cv_text = cv_text[:8000]: str, locations: list[str], limit: int, api_key: str, on_stage):
     llm = make_llm(api_key)
 
     on_stage("CV Analyst", "Reading your CV")
@@ -63,7 +63,7 @@ def find_jobs(cv_text: str, locations: list[str], limit: int, api_key: str, on_s
     )
 
     on_stage("Job Scout", "Searching public job listings")
-    search_results = run_agent(
+    search_results = search_results[:6000] = run_agent(
         create_job_scout(llm),
         (
             f"Candidate CV profile:\n{profile}\n\n"
