@@ -2,10 +2,6 @@ import json
 import re
 
 import crewai.llms.cache as crewai_cache
-
-# Work around CrewAI adding an unsupported cache_breakpoint field to Groq requests.
-crewai_cache.mark_cache_breakpoint = lambda message: message
-
 from crewai import Crew, LLM, Process, Task
 
 from agents.cv_analyst import create_cv_analyst
@@ -13,6 +9,9 @@ from agents.cv_tailor import create_cv_tailor
 from agents.job_scout import create_job_scout
 from agents.match_reviewer import create_match_reviewer
 
+
+# Groq rejects CrewAI's Anthropic-specific cache marker.
+crewai_cache.mark_cache_breakpoint = lambda message: message
 
 MODEL_NAME = "openai/gpt-oss-120b"
 
@@ -47,7 +46,9 @@ def extract_json(text: str) -> dict:
     return json.loads(match.group(0))
 
 
-def find_jobs(cv_text = cv_text[:8000]: str, locations: list[str], limit: int, api_key: str, on_stage):
+def find_jobs(cv_text: str, locations: list[str], limit: int, api_key: str, on_stage):
+    # Keep prompts smaller to reduce Groq tokens per request.
+    cv_text = cv_text[:8000]
     llm = make_llm(api_key)
 
     on_stage("CV Analyst", "Reading your CV")
@@ -57,32 +58,32 @@ def find_jobs(cv_text = cv_text[:8000]: str, locations: list[str], limit: int, a
             "Use the CV text reader tool to review the supplied CV. Summarize "
             "stated civil engineering roles, experience duration if supported "
             "by dates, technical skills, project types, sectors, and software. "
-            "Do not include contact details. Keep the profile under 250 words."
+            "Do not include contact details. Keep the profile under 150 words."
         ),
         "A concise evidence-based CV profile and job search keywords.",
     )
 
     on_stage("Job Scout", "Searching public job listings")
-    search_results = search_results[:6000] = run_agent(
+    search_results = run_agent(
         create_job_scout(llm),
         (
-            f"Candidate CV profile:\n{profile}\n\n"
+            f"Candidate CV profile:\n{profile[:4000]}\n\n"
             f"Search locations: {', '.join(locations)}.\n"
-            f"Use the Public web job search tool for these locations. Find up "
-            f"to {limit} relevant civil engineering listings. Keep the title, "
-            "employer if shown, location, original URL, and a short search "
-            "snippet. Never invent listing details or URLs."
+            f"Use the Public web job search tool. Find up to {limit} relevant "
+            "civil engineering listings. Keep each title, employer if shown, "
+            "location, original URL, and a short snippet. Do not invent details."
         ),
-        "Public job listings with original URLs and search snippets.",
+        "A short list of public job listings with original URLs.",
     )
+    search_results = search_results[:6000]
 
     on_stage("Match Reviewer", "Reviewing match evidence")
     reviewed = run_agent(
         create_match_reviewer(llm),
         (
-            f"CV profile:\n{profile}\n\n"
-            f"Public search results:\n{search_results}\n\n"
-            "Return ONLY valid JSON in this format:\n"
+            f"CV profile:\n{profile[:4000]}\n\n"
+            f"Public job search results:\n{search_results}\n\n"
+            "Return ONLY valid JSON with this structure:\n"
             "{"
             '"profile_summary": "string", '
             '"jobs": ['
@@ -98,21 +99,19 @@ def find_jobs(cv_text = cv_text[:8000]: str, locations: list[str], limit: int, a
             "], "
             '"notes": "string"'
             "}\n"
-            f"Include no more than {limit} results and only listings with an "
-            "http or https URL. Score evidence-based role, skill, and "
-            "experience alignment from 0 to 100. This is an approximate "
-            "review aid, not a probability or hiring recommendation. Explain "
-            "the score and any missing information."
+            f"Include up to {limit} listings and only URLs starting with "
+            "http or https. Scores are approximate review aids, not "
+            "probabilities or hiring decisions. Explain each match briefly."
         ),
-        "Valid JSON with a profile summary and cautious job match results.",
+        "Valid JSON with a profile summary and cautious job matches.",
     )
 
     data = extract_json(reviewed)
     data["jobs"] = [
-        job for job in data.get("jobs", [])
+        job
+        for job in data.get("jobs", [])
         if str(job.get("url", "")).startswith(("https://", "http://"))
     ]
-
     return profile, data
 
 
@@ -123,8 +122,8 @@ def tailor_cv(cv_text: str, selected_job: dict, api_key: str) -> str:
     return run_agent(
         agent,
         (
-            "Create an editable, plain-text CV draft tailored to this job.\n\n"
-            f"ORIGINAL CV TEXT:\n{cv_text[:20000]}\n\n"
+            "Create an editable plain-text CV draft for the selected job.\n\n"
+            f"ORIGINAL CV TEXT:\n{cv_text[:8000]}\n\n"
             "SELECTED JOB:\n"
             f"Title: {selected_job.get('title', '')}\n"
             f"Company: {selected_job.get('company', '')}\n"
@@ -132,11 +131,10 @@ def tailor_cv(cv_text: str, selected_job: dict, api_key: str) -> str:
             f"Requirements: {selected_job.get('requirements', '')}\n"
             f"Match evidence: {selected_job.get('why_match', '')}\n\n"
             "Use headings: PROFESSIONAL SUMMARY, KEY SKILLS, PROFESSIONAL "
-            "EXPERIENCE, EDUCATION AND CERTIFICATIONS, GAPS TO REVIEW. Keep "
-            "names, dates, qualifications, and achievements factual. You may "
-            "reorder and rephrase existing facts to highlight relevant "
-            "experience. Do not add unsupported information. Put unsupported "
-            "criteria under GAPS TO REVIEW. Return only the CV draft."
+            "EXPERIENCE, EDUCATION AND CERTIFICATIONS, GAPS TO REVIEW. "
+            "Reorganize existing facts to highlight relevant experience. "
+            "Never invent qualifications, dates, skills, or achievements. "
+            "Return only the CV draft."
         ),
-        "An editable CV draft based only on facts in the original CV.",
+        "An editable CV draft based only on the original CV facts.",
     )
