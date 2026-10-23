@@ -121,7 +121,7 @@ with st.sidebar:
         default=["Pakistan", "United Arab Emirates", "Saudi Arabia"],
     )
 
-    max_jobs = st.slider("Maximum listings", 5, 15, 10)
+    max_jobs = st.slider("Maximum listings", 3, 8, 5)
 
 left, right = st.columns([1, 1], gap="large")
 
