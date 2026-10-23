@@ -189,7 +189,7 @@ if "results" in st.session_state:
             "including more detail about previous designations and skills."
         )
         
-        for index, job in enumerate(jobs):
+    for index, job in enumerate(jobs):
         with st.container(border=True):
             st.subheader(job.get("title", "Job title not listed"))
             st.write(
