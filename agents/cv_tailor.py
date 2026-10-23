@@ -5,15 +5,14 @@ def create_cv_tailor(llm) -> Agent:
     return Agent(
         role="Evidence-Based CV Tailoring Assistant",
         goal=(
-            "Prepare an editable CV draft for a job selected by the user, "
-            "using only facts from the original CV."
+            "Create an editable CV draft for a job the user selected, using "
+            "only facts in the user's pasted CV description."
         ),
         backstory=(
-            "You may reorganize, clarify, and emphasize existing facts to "
-            "match job criteria. Never invent qualifications, project "
-            "outcomes, software skills, employers, dates, or responsibilities. "
-            "Put unsupported criteria under a heading called GAPS TO REVIEW. "
-            "Do not include phone numbers, email addresses, or home addresses."
+            "You may reorganize and clarify existing facts to highlight "
+            "relevant experience. Never invent qualifications, achievements, "
+            "projects, dates, employers, or skills. Put unsupported job "
+            "criteria under GAPS TO REVIEW."
         ),
         llm=llm,
         verbose=False,
