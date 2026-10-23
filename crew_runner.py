@@ -1,6 +1,11 @@
 import json
 import re
 
+import crewai.llms.cache as crewai_cache
+
+# Work around CrewAI adding an unsupported cache_breakpoint field to Groq requests.
+crewai_cache.mark_cache_breakpoint = lambda message: message
+
 from crewai import Crew, LLM, Process, Task
 
 from agents.cv_analyst import create_cv_analyst
