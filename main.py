@@ -188,9 +188,6 @@ if "results" in st.session_state:
             "No verifiable listings were found. Try adding locations or "
             "including more detail about previous designations and skills."
         )
-
-
-
         
         for index, job in enumerate(jobs):
         with st.container(border=True):
