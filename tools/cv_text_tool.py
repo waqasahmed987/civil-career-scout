@@ -4,21 +4,24 @@ from pydantic import BaseModel, Field
 
 class CVTextInput(BaseModel):
     instruction: str = Field(
-        default="Read the CV text provided by the user.",
-        description="Instruction for reviewing the extracted CV text.",
+        default="Review the CV description pasted by the user.",
+        description="Instruction for reviewing the candidate's CV description.",
     )
 
 
 class CVTextTool(BaseTool):
-    name: str = "CV text reader"
+    name: str = "CV description reader"
     description: str = (
-        "Read text already extracted from the user's PDF or DOCX CV. "
-        "The original file is not saved by this tool."
+        "Read the CV description pasted by the user. Extract only information "
+        "that appears in that description."
     )
     args_schema: type[BaseModel] = CVTextInput
     cv_text: str
 
-    def _run(self, instruction: str = "Read the CV text.") -> str:
+    def _run(
+        self,
+        instruction: str = "Review the CV description pasted by the user.",
+    ) -> str:
         if not self.cv_text.strip():
-            return "No readable CV text was provided."
-        return self.cv_text[:24000]
+            return "The user has not provided CV text."
+        return self.cv_text[:10000]
