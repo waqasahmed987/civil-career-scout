@@ -41,14 +41,18 @@ def run_agent(agent, description: str, expected_output: str) -> str:
 
 
 def extract_json(text: str) -> dict:
-    # Handle JSON wrapped in a Markdown code fence as well as plain JSON.
     cleaned = re.sub(r"```(?:json)?|```", "", text).strip()
     match = re.search(r"\{.*\}", cleaned, re.DOTALL)
 
-    if not match:
-        raise ValueError("The reviewer did not return JSON. Please try again.")
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            pass
 
-    return json.loads(match.group(0))
+    # Let the app display real search results even if the reviewer
+    # doesn't return parseable JSON.
+    return {}
 
 
 def find_jobs(
@@ -130,27 +134,57 @@ def find_jobs(
         "Valid JSON with verified-source URLs and cautious match explanations.",
     )
 
-    data = extract_json(reviewed)
+       data = extract_json(reviewed)
 
-    allowed_urls = {
-        item["url"] for item in verified_source_results if item.get("url")
+    allowed_by_url = {
+        item["url"]: item
+        for item in verified_source_results
+        if item.get("url")
     }
 
     filtered_jobs = []
+
     for job in data.get("jobs", []):
-        if job.get("url") not in allowed_urls:
+        url = job.get("url", "")
+        source = allowed_by_url.get(url)
+
+        if not source:
             continue
 
-        # Attach the original snippet so the user can judge the evidence.
-        source = next(
-            item for item in verified_source_results
-            if item["url"] == job["url"]
-        )
         job["source_type"] = source["source_type"]
         job["source_snippet"] = source["snippet"]
         filtered_jobs.append(job)
 
+    # If reviewer JSON is missing or unusable, show the actual URLs
+    # found by the search tool without inventing a match score.
+    if not filtered_jobs:
+        for source in verified_source_results[:limit]:
+            filtered_jobs.append({
+                "title": source.get("title") or "Open listing to review details",
+                "company": "See original listing",
+                "location": ", ".join(locations),
+                "url": source["url"],
+                "source_type": source["source_type"],
+                "match_score": None,
+                "why_match": (
+                    "Automatic match review was unavailable. "
+                    "Compare this listing with your experience."
+                ),
+                "requirements": "",
+                "source_snippet": source.get("snippet", ""),
+            })
+
     data["jobs"] = filtered_jobs[:limit]
+
+    if not data.get("profile_summary"):
+        data["profile_summary"] = profile
+
+    if not data.get("notes"):
+        data["notes"] = (
+            "Some results may not include automatic match explanations. "
+            "Review the original listing and compare it with your experience."
+        )
+
     return profile, data
 
 
