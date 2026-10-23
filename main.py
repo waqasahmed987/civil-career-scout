@@ -199,10 +199,10 @@ if "results" in st.session_state:
             st.caption(
                 f"Source type: {job.get('source_type', 'Web search')}"
             )
-            st.metric(
-                "Approximate experience match",
-                f"{job.get('match_score', '—')}%",
-            )
+           score = job.get("match_score")
+score_display = f"{score}%" if isinstance(score, (int, float)) else "Not scored"
+
+st.metric("Approximate experience match", score_display)
             st.write(job.get("why_match", "Review the original listing."))
 
             if job.get("requirements"):
